@@ -62,6 +62,6 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 	</div>
 </header>
 
-<?php /* Oma Gerda (theme lebensecht): the header ad also shows on the home page — Facebook visitors see an ad first everywhere. */ if ( ! is_404() && ! ( is_search() && ! have_posts() ) ) { le_top_ad(); } le_home_intro(); ?>
+<?php /* Deutsche Rezepte (theme deutsche-rezepte): the header ad also shows on the home page — Facebook visitors see an ad first everywhere. */ if ( ! is_404() && ! ( is_search() && ! have_posts() ) ) { dr_top_ad(); } dr_home_intro(); ?>
 
 <main id="content" class="site-main" tabindex="-1">

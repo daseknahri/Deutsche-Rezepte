@@ -197,6 +197,31 @@ function wpap_schedule_future_publish( $post_id, $ts_gmt ) {
 }
 
 /**
+ * Convert an author page-break TOKEN into WordPress's native <!--nextpage--> marker.
+ *
+ * Ported verbatim from build-final (wpap_apply_content_pagebreaks, 9.47.0 / BL-102): batch JSON paginated by
+ * batch-enrich/repaginate.mjs carries [nextpage] tokens, which build-v9 previously published as literal text.
+ * Accepts [nextpage] / [next-page] / [next page] / [next_page] (case-insensitive) and strips an enclosing
+ * <p>…</p> so no empty paragraph is left behind. A raw <!--nextpage--> is left as-is. Runs BEFORE (and
+ * independently of) the equal-parts splitter, so a token always wins over the "parts" option.
+ *
+ * @param string $content
+ * @return string
+ */
+function wpap_apply_content_pagebreaks( $content ) {
+    $content = (string) $content;
+    if ( '' === $content || false === stripos( $content, '[next' ) ) {
+        return $content;   /* cheap early-out: no token present */
+    }
+    /* The token, optionally wrapped in its own paragraph and/or surrounded by whitespace. */
+    return preg_replace(
+        '#(?:<p>\s*)?\[\s*next[\s_-]?page\s*\](?:\s*</p>)?#i',
+        "\n<!--nextpage-->\n",
+        $content
+    );
+}
+
+/**
  * Split an HTML article body into N paginated parts joined with <!--nextpage-->.
  *
  * WordPress paginates a post wherever it finds a <!--nextpage--> comment, so

@@ -2,7 +2,7 @@
 # This file is distributed under the GNU General Public License v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Viral Reader 1.9.29\n"
+"Project-Id-Version: Viral Reader 1.9.35\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/theme/theme\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: German\n"

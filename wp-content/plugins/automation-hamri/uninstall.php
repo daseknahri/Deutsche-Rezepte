@@ -55,6 +55,8 @@ if ( defined( 'WPAP_UNINSTALL_PURGE' ) && WPAP_UNINSTALL_PURGE ) {
     global $wpdb;
     $wpap_table = $wpdb->prefix . 'wpap_generated_posts';   /* WPAP_TABLE literal */
     $wpdb->query( "DROP TABLE IF EXISTS `{$wpap_table}`" );
+    $wpap_tomb = $wpdb->prefix . 'wpap_tombstones';          /* WPAP_TOMB_TABLE literal (9.47.0, BL-105) */
+    $wpdb->query( "DROP TABLE IF EXISTS `{$wpap_tomb}`" );
 
     foreach ( array(
         'wpap_settings',                 /* API keys / config      */
@@ -77,8 +79,24 @@ if ( defined( 'WPAP_UNINSTALL_PURGE' ) && WPAP_UNINSTALL_PURGE ) {
         'wpap_automation_giveup_keys',
         'wpap_automation_lock',
         'wpap_automation_alert_sent',
+        'wpap_tomb_migrated',            /* tombstone-table migration flag (table dropped above) */
+        /* Social posters (9.43–9.46) — wpap_fbpage holds the Facebook Page access TOKEN (also used by Instagram),
+           so a "purged" DB dump must not still carry it. 9.47.0, BL-105. */
+        'wpap_fbpage',                   /* Facebook Page poster config + Page token */
+        'wpap_fbp_page_name',
+        'wpap_fbp_paused',
+        'wpap_fbp_log',
+        'wpap_fbp_day',                  /* per-day share counter */
+        'wpap_igpage',                   /* Instagram poster config */
+        'wpap_igp_paused',
+        'wpap_igp_day',
+        'wpap_pinterest',                /* Pinterest pin data / CSV / feed config */
+        'wpap_pin_flush_rules',
     ) as $wpap_opt ) {
         delete_option( $wpap_opt );
     }
+    delete_transient( 'wpap_fbp_backoff' );
+    delete_transient( 'wpap_igp_backoff' );
     wp_clear_scheduled_hook( 'wpap_automation_cron' );
+    wp_clear_scheduled_hook( 'wpap_fbp_cron' );          /* WPAP_FBP_CRON literal (FB + IG poster tick) */
 }

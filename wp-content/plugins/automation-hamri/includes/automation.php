@@ -202,13 +202,19 @@ function wpap_automation_fetch_rows( $url ) {
     $current  = $url;
     $response = null;
     $followed = 0;
+    /* Cap the fetch to bound memory, but generously — a full catalogue Sheet (hundreds of rows × full HTML
+       bodies) is several MB (a 692-row batch ≈ 2.7 MB). The old 5 MB cap silently truncated a large Sheet and
+       the parser then published a corrupted tail row. Raise the ceiling AND detect truncation below so it
+       fails loudly instead. Ported from build-final 8.76.0 (9.47.0, BL-103). Floor 1 MB. */
+    $max_bytes = (int) apply_filters( 'wpap_sheet_max_bytes', 24 * 1024 * 1024 );
+    if ( $max_bytes < 1048576 ) { $max_bytes = 1048576; }
     while ( true ) {
         $response = wpap_safe_remote_get( $current, array(
-            'timeout'             => 10,
+            'timeout'             => 20,           /* big Sheets need longer than the old 10 s */
             'redirection'         => 0,            /* follow manually, re-resolving + re-pinning each hop */
             'sslverify'           => true,
             'reject_unsafe_urls'  => true,
-            'limit_response_size' => 5 * 1024 * 1024,
+            'limit_response_size' => $max_bytes,
             'headers'             => array( 'Accept' => 'text/csv, text/plain, */*' ),
         ) );
         if ( is_wp_error( $response ) ) {
@@ -245,6 +251,14 @@ function wpap_automation_fetch_rows( $url ) {
     $body = (string) wp_remote_retrieve_body( $response );
     if ( '' === trim( $body ) ) {
         return new WP_Error( 'wpap_empty', 'The published Sheet returned no data.' );
+    }
+    /* Truncation guard: if the body reached the fetch ceiling, WP cut it mid-file and the last CSV row is now
+       partial — publishing it would create a corrupted post. Refuse loudly instead of importing garbage. */
+    if ( strlen( $body ) >= $max_bytes ) {
+        return new WP_Error( 'wpap_truncated', sprintf(
+            'The published Sheet exceeded the %d MB fetch limit and was truncated. Split it into smaller Sheets, or raise the limit via the wpap_sheet_max_bytes filter.',
+            (int) round( $max_bytes / 1048576 )
+        ) );
     }
 
     /* Guard against the wrong URL (edit/view page instead of the CSV export). */

@@ -267,14 +267,22 @@
                 '</div>' +
                 '<div class="wpap-ctrl-wrap">' +
                   '<span class="wpap-ctrl-label">🕒 Schedule:</span>' +
-                  '<select id="wpap-publish-schedule" class="wpap-ctrl-select" title="Spread the batch evenly over the next hours, publishing in the order you added them">' +
-                    '<option value="0">Publish now (all at once)</option>' +
-                    '<option value="1">Spread over 1h (in order)</option>' +
-                    '<option value="3">Spread over 3h (in order)</option>' +
-                    '<option value="6" selected>Spread over 6h (in order)</option>' +
-                    '<option value="12">Spread over 12h (in order)</option>' +
-                    '<option value="24">Spread over 24h (in order)</option>' +
-                    '<option value="48">Spread over 48h (in order)</option>' +
+                  '<select id="wpap-publish-schedule" class="wpap-ctrl-select" title="Spread the batch evenly over the next hours (in the order you added them), or a human drip: ~N posts/day queued after your last scheduled post, daytime 8am-10pm only">' +
+                    '<optgroup label="Spread over hours (in order)">' +
+                      '<option value="0">Publish now (all at once)</option>' +
+                      '<option value="1">Spread over 1h (in order)</option>' +
+                      '<option value="3">Spread over 3h (in order)</option>' +
+                      '<option value="6" selected>Spread over 6h (in order)</option>' +
+                      '<option value="12">Spread over 12h (in order)</option>' +
+                      '<option value="24">Spread over 24h (in order)</option>' +
+                      '<option value="48">Spread over 48h (in order)</option>' +
+                    '</optgroup>' +
+                    '<optgroup label="Human drip (over days · 8am–10pm)">' +
+                      '<option value="drip:30">🚶 ~30 / day</option>' +
+                      '<option value="drip:20">🚶 ~20 / day</option>' +
+                      '<option value="drip:12">🚶 ~12 / day</option>' +
+                      '<option value="drip:6">🚶 ~6 / day (slow)</option>' +
+                    '</optgroup>' +
                   '</select>' +
                 '</div>' +
                 '<span id="wpap-publish-stats" class="wpap-stats" style="display:none"></span>' +
@@ -1090,11 +1098,15 @@
     var numParts    = partsSel ? partsSel.value : "1";
     var schedWindow = schedSel ? schedSel.value : "0";
     var partsN      = parseInt(numParts, 10) || 1;
-    var winN        = parseFloat(schedWindow) || 0;
+    var dripMatch   = /^drip:(\d+)$/.exec(schedWindow);
+    var dripN       = dripMatch ? parseInt(dripMatch[1], 10) : 0;
+    var winN        = dripN ? 0 : (parseFloat(schedWindow) || 0);
 
     var confirmMsg = "Publish " + items.length + " post(s) directly to WordPress?"
       + "\n• Split: " + (partsN > 1 ? ("into " + partsN + " pages (per-item \"parts\" overrides this)") : "single page")
-      + "\n• Timing: " + (winN > 0 ? ("spread evenly over the next " + winN + "h, published in the order listed") : "publish now");
+      + "\n• Timing: " + (dripN
+          ? ("human drip — ~" + dripN + "/day, queued after your last scheduled post, over ~" + Math.ceil(items.length / dripN) + " day(s), daytime only")
+          : (winN > 0 ? ("spread evenly over the next " + winN + "h, published in the order listed") : "publish now"));
     if (!confirm(confirmMsg)) return;
 
     var logWrap = document.getElementById("wpap-publish-log");

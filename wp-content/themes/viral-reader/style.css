@@ -4,7 +4,7 @@ Theme URI: https://wa.me/212637122491
 Author: Oussama Hamri
 Author URI: https://wa.me/212637122491
 Description: A warm, editorial, mobile-first blog theme for long-form writing — cream "paper" palette, serif reading column with a sans UI, a cinematic hero, a sticky reading sidebar, quote/pull-quote styling, and ad-native spacing. Fast and light (system fonts, no jQuery, light mode). Pairs with the WP Automator Pro plugin: header/sidebar/footer ad zones and native in-content ad styling. English throughout.
-Version: 1.9.34
+Version: 1.9.37
 Requires at least: 5.5
 Tested up to: 6.6
 Requires PHP: 7.2
@@ -391,6 +391,17 @@ body.vr-hero-stacked .home-hero :focus-visible{outline-color:var(--copper)}
 
 /* ===== Single ===== */
 .content-layout--single-post{display:grid;grid-template-columns:minmax(0,var(--measure)) minmax(260px,320px);gap:56px;align-items:start;padding:26px 0 10px}
+/* Grid items default to min-width:auto, so an unshrinkable child (an embed iframe,
+   a long URL) widens the item past its track and pushes the whole column off-screen
+   — a ~21px horizontal scroll on phones. min-width:0 lets items shrink to the track. */
+.content-layout--single-post>*{min-width:0}
+.entry{max-width:100%}
+.entry img,.entry iframe,.entry video,.entry .wp-block-embed__wrapper,.entry figure{max-width:100%}
+.entry-content pre,.entry-content code,.entry-content table{max-width:100%;overflow-x:auto}
+/* Search form: the flex input keeps min-width:auto, so at ~320px the submit
+   button overflows the form. min-width:0 lets the input shrink to share the row. */
+.vr-search{max-width:100%}
+.vr-search input{min-width:0}
 /* Author box / related / post-nav / comments live below the article+sidebar grid.
    Kept to the reading-column width on desktop so they align under the article and
    comments keep a comfortable line length; full-width on phones. Putting them

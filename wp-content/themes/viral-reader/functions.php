@@ -15,7 +15,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! defined( 'VR_VERSION' ) ) {
-	define( 'VR_VERSION', '1.9.34' );
+	define( 'VR_VERSION', '1.9.37' );
 }
 
 /* Customizer → "Site options" (noun, topic-cover fallback, author byline). */
@@ -312,16 +312,39 @@ function vr_css_string( $s ) {
 	return '"' . $s . '"';
 }
 
+/* True when the LiteSpeed Cache plugin has UCSS (Unique CSS) enabled: LSCWP
+   parses the enqueued stylesheets, strips unused rules per URL, and serves one
+   small optimized file. In that mode the theme's full inline copy in <head> is
+   dead weight the optimizer cannot see — the external <link> is the right input
+   for the UCSS pipeline. */
+function vr_litespeed_ucss_active() {
+	if ( ! class_exists( 'LiteSpeed\\Conf' ) ) {
+		return false;
+	}
+	try {
+		$conf = \LiteSpeed\Conf::cls();
+		if ( is_object( $conf ) && method_exists( $conf, 'conf' ) ) {
+			return (bool) $conf->conf( 'optm-ucss' );
+		}
+	} catch ( \Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- detection best-effort; any internal error means "not active"
+	}
+	return false;
+}
+
 function vr_scripts() {
 	/* Inline the whole stylesheet into <head> instead of loading it as a
 	   render-blocking <link>. The CSS is ~8KB gzipped, so inlining removes an
 	   entire blocking round-trip on the critical path — the single biggest
 	   FCP/LCP win on mobile. We still register the 'viral-reader' handle (with
 	   no src) so any wp_add_inline_style() from child themes/plugins keeps
-	   working. Falls back to the normal <link> if the file can't be read. */
-	$css_path = get_stylesheet_directory() . '/style.css';
+	   working. Falls back to the normal <link> if the file can't be read.
+	   Skipped entirely when LiteSpeed UCSS is active (it owns the CSS pipeline
+	   and rebuilds a per-URL stylesheet); override with the
+	   `vr_inline_stylesheet` filter. */
+	$inline_css = apply_filters( 'vr_inline_stylesheet', ! vr_litespeed_ucss_active() );
+	$css_path   = get_stylesheet_directory() . '/style.css';
 	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- reading a bundled, size-capped theme file to inline critical CSS; WP_Filesystem is heavier on the front-end hot path and unnecessary for a local read.
-	$css      = ( ! is_admin() && is_readable( $css_path ) ) ? file_get_contents( $css_path ) : false;
+	$css        = ( $inline_css && ! is_admin() && is_readable( $css_path ) ) ? file_get_contents( $css_path ) : false;
 
 	if ( false !== $css && strlen( $css ) > 0 && strlen( $css ) < 100000 ) {
 		wp_register_style( 'viral-reader', false, array(), VR_VERSION );
@@ -331,7 +354,7 @@ function vr_scripts() {
 		wp_enqueue_style( 'viral-reader', get_stylesheet_uri(), array(), VR_VERSION );
 	}
 	/* The ad label the stylesheet prints above each ad (::before) comes from the translation files, e.g. "Anzeige"
-	   on a German site; style.css falls back to "Advertisement". */
+	   on a German site; style.css falls back to "Advertisement". Kept inline in both modes (few dozen bytes). */
 	wp_add_inline_style( 'viral-reader', ':root{--vr-ad-label:' . vr_css_string( __( 'Advertisement', 'viral-reader' ) ) . '}' );
 
 	wp_enqueue_script( 'viral-reader', get_template_directory_uri() . '/assets/js/site.js', array(), VR_VERSION, true );
@@ -467,6 +490,99 @@ function vr_pin_media_attr( $attr, $attachment, $size ) {
 	return $attr;
 }
 add_filter( 'wp_get_attachment_image_attributes', 'vr_pin_media_attr', 10, 3 );
+
+/* ─────────────────────────────────────────────
+   Responsive in-content images (opt-in, BL-124)
+────────────────────────────────────────────── */
+/* Post content written by the publish pipeline stores raw <img> tags with no
+   wp-image-{id} class, so core wp_filter_content_tags() skips them: no srcset,
+   no dimensions — mobile downloads the WP-scaled original (-1.jpg) at full
+   width. This filter maps same-site upload srcs back to their attachment,
+   stamps the class + width/height, and core then adds srcset/sizes/loading at
+   its normal the_content priority (this runs at 9, core at 10). OFF by default
+   per the opt-in rule; enable per site with:
+     add_filter( 'vr_responsive_content_images', '__return_true' );
+   Page output is cache-plugin mediated, so the URL→ID lookups only run on
+   cache misses; attachment_url_to_postid() hits are cached by core. */
+function vr_attachment_id_from_url( $src, $baseurl ) {
+	$rel  = ltrim( substr( $src, strlen( $baseurl ) ), '/' );
+	$path = wp_parse_url( $rel, PHP_URL_PATH ); // strip ?v= / #fragments.
+	if ( empty( $path ) ) {
+		return 0;
+	}
+	$candidates = array( $path );
+	/* Sized variants (name-768x439.jpg) attach to the original name.jpg. WP's
+	   big-image scale (name-1.jpg) is itself a real file, so it stays as-is. */
+	$stripped   = preg_replace( '/-\d+x\d+(\.[^.]+)$/', '$1', $path );
+	if ( $stripped !== $path ) {
+		$candidates[] = $stripped;
+	}
+	foreach ( $candidates as $candidate ) {
+		$id = attachment_url_to_postid( $baseurl . '/' . $candidate );
+		if ( $id ) {
+			return (int) $id;
+		}
+	}
+	return 0;
+}
+
+function vr_responsive_content_images( $content ) {
+	if ( ! apply_filters( 'vr_responsive_content_images', false ) || false === strpos( $content, '<img' ) ) {
+		return $content;
+	}
+	$uploads = wp_upload_dir();
+	$baseurl = set_url_scheme( $uploads['baseurl'] );
+	if ( ! preg_match_all( '#<img\s[^>]*?>#i', $content, $m ) ) {
+		return $content;
+	}
+	foreach ( array_unique( $m[0] ) as $tag ) {
+		if ( ! preg_match( '#\ssrc\s*=\s*["\']([^"\']+)["\']#i', $tag, $sm ) ) {
+			continue;
+		}
+		$src = $sm[1];
+		if ( 0 !== stripos( $src, $baseurl ) || preg_match( '#\bwp-image-\d+\b#', $tag ) ) {
+			continue; // Hotlinked/CDN, or core already handles it.
+		}
+		$attachment_id = vr_attachment_id_from_url( $src, $baseurl );
+		if ( ! $attachment_id ) {
+			continue;
+		}
+		$meta = wp_get_attachment_metadata( $attachment_id );
+		if ( ! is_array( $meta ) || empty( $meta['file'] ) ) {
+			continue;
+		}
+		/* Match the requested file to a stored size so width/height are exact. */
+		$file   = rawurldecode( basename( wp_parse_url( $src, PHP_URL_PATH ) ) );
+		$width  = 0;
+		$height = 0;
+		if ( basename( $meta['file'] ) === $file ) {
+			$width  = (int) $meta['width'];
+			$height = (int) $meta['height'];
+		} elseif ( ! empty( $meta['sizes'] ) && is_array( $meta['sizes'] ) ) {
+			foreach ( $meta['sizes'] as $size ) {
+				if ( ! empty( $size['file'] ) && $size['file'] === $file ) {
+					$width  = (int) $size['width'];
+					$height = (int) $size['height'];
+					break;
+				}
+			}
+		}
+		$new = $tag;
+		if ( $width && $height && false === stripos( $new, ' width=' ) ) {
+			/* Insert before the closing slash so '/>' does not break. */
+			$new = preg_replace( '#\s*/?>\s*$#', ' width="' . $width . '" height="' . $height . '"$0', $new, 1 );
+		}
+		$class_attr = 'wp-image-' . $attachment_id;
+		if ( preg_match( '#\sclass\s*=\s*["\']([^"\']*)["\']#i', $new, $cm ) ) {
+			$new = str_replace( $cm[0], ' class="' . trim( $cm[1] . ' ' . $class_attr ) . '"', $new );
+		} else {
+			$new = preg_replace( '#<img#i', '<img class="' . $class_attr . '"', $new, 1 );
+		}
+		$content = str_replace( $tag, $new, $content );
+	}
+	return $content;
+}
+add_filter( 'the_content', 'vr_responsive_content_images', 9 );
 
 /* Preload the LCP image in <head>, before the ~KB of inlined CSS, so the preload
    scanner starts the fetch ~1 RTT sooner — the biggest remaining LCP lever on
@@ -1094,10 +1210,15 @@ function vr_social_icon_svg( $network ) {
 function vr_brand_social_html() {
 	$profiles = vr_social_profiles();
 	if ( empty( $profiles ) ) { return ''; }
-	$labels = array_flip( array_map( 'strtolower', vr_author_social_labels() ) );
-	$items  = '';
+	/* Proper display names ("YouTube", "TikTok", "LinkedIn") keyed by network slug —
+	   a bare ucfirst() would print "Youtube" / "Tiktok" in the labels. */
+	$proper = array();
+	foreach ( vr_author_social_labels() as $lbl ) {
+		$proper[ strtolower( $lbl ) ] = $lbl;
+	}
+	$items = '';
 	foreach ( $profiles as $p ) {
-		$name  = ucfirst( $p['network'] );
+		$name  = isset( $proper[ $p['network'] ] ) ? $proper[ $p['network'] ] : ucfirst( $p['network'] );
 		/* translators: %s: social network name (e.g. "Facebook") */
 		$aria  = sprintf( __( 'Follow us on %s', 'viral-reader' ), $name );
 		$items .= '<li><a class="vr-brand-social__link" href="' . esc_url( $p['url'] ) . '"'

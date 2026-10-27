@@ -312,6 +312,30 @@ function wpap_publish_article( array $item, array $opts = array() ) {
         ? trim( (string) $opts['default_category'] ) : '';
     $source_key       = ( isset( $opts['source_key'] ) && is_scalar( $opts['source_key'] ) )
         ? (string) $opts['source_key'] : '';
+    /* The caller's own key (the Sheet automation's row key). Kept separately so the "Skip duplicate titles"
+       option keeps its exact pre-9.48 scope (manual / Direct Publish / ZIP / REST only) even when the item's
+       `id` is adopted as the source key just below. */
+    $caller_source_key = $source_key;
+    /* 9.48.0 (BL-119, ported from build-final): stable WRITER id → the durable dedup key. When the caller didn't
+       supply a source_key (Direct Publish, Bulk ZIP, REST), adopt the item's `id` so a re-sent batch / double
+       import / XHR retry never creates a duplicate post. Items without an `id` behave exactly as before. */
+    if ( '' === $source_key && isset( $item['id'] ) && is_scalar( $item['id'] ) ) {
+        $source_key = trim( (string) $item['id'] );
+    }
+    /* DURABLE skip-guard: a NON-TRASHED post already carrying this key means the item is already published →
+       skip instead of duplicating. ALWAYS on, independent of "Skip duplicate titles" (it only ever matches an
+       exact re-send of the same id/key). One index-backed lookup (wpap_meta_dedup). A trashed original does
+       not block a re-publish. Also the backstop for the Sheet's prunable "seen" cache. */
+    if ( '' !== $source_key ) {
+        $wpap_dupe = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT pm.post_id FROM {$wpdb->postmeta} pm JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+              WHERE pm.meta_key = '_wpap_source_key' AND pm.meta_value = %s AND p.post_status <> 'trash' LIMIT 1",
+            $source_key
+        ) );
+        if ( $wpap_dupe > 0 ) {
+            return new WP_Error( 'wpap_duplicate', sprintf( 'skipped: already published (id/key exists as post #%d).', $wpap_dupe ) );
+        }
+    }
     /* Author: an explicit opt wins; otherwise a site can pin bulk-published posts to its
        real bylined writer (not whatever admin account is logged in) via the
        'wpap_default_author' filter — important for a single-author blog's E-E-A-T, so the
@@ -393,9 +417,10 @@ function wpap_publish_article( array $item, array $opts = array() ) {
 
     /* Skip duplicate titles: don't create a second post with a title that already
        exists — protects against re-uploading the same file/batch. Only for
-       manual/Direct-Publish (source_key empty); the Sheet automation has its own
-       row-key dedup and we don't want to fight its retry logic. */
-    if ( ! empty( $copts['skip_dupe_titles'] ) && '' === $source_key && wpap_post_title_exists( $title ) ) {
+       manual/Direct-Publish (no caller source_key); the Sheet automation has its own
+       row-key dedup and we don't want to fight its retry logic. An adopted item `id`
+       does NOT bypass it (same id = already caught by the source-key guard above). */
+    if ( ! empty( $copts['skip_dupe_titles'] ) && '' === $caller_source_key && wpap_post_title_exists( $title ) ) {
         return new WP_Error( 'wpap_dupe', sprintf( 'skipped: a post titled "%s" already exists.', $title ) );
     }
 
@@ -411,6 +436,12 @@ function wpap_publish_article( array $item, array $opts = array() ) {
 
     /* Comments: close them on published posts if the owner opted in (spam hygiene). */
     $comment_status = ! empty( $copts['disable_comments'] ) ? 'closed' : get_default_comment_status( 'post' );
+
+    /* ── content-driven page breaks: convert a [nextpage] token to WP's native <!--nextpage--> so the post
+       paginates exactly where the content says (each break = a real page/pageview) and the literal token is
+       removed. Done FIRST so a token always wins over the equal-parts option, and unconditionally so it works
+       even when "Pages" is 1. Same order + semantics as build-final (9.47.0, BL-102). ── */
+    $content = wpap_apply_content_pagebreaks( $content );
 
     /* ── internal links: [[link:slug|anchor]] → a real <a href> when a PUBLISHED post owns the slug,
        else a reader-invisible, kses-safe marker the "Resolve internal links" pass upgrades once the
@@ -792,9 +823,9 @@ function wpap_ajax_bulk_publish_posts() {
     if ( $default_parts < 1 )  { $default_parts = 1; }
     if ( $default_parts > 10 ) { $default_parts = 10; }
 
-    $schedule_window = isset( $_POST['schedule_window'] ) ? (float) $_POST['schedule_window'] : 0;
-    if ( $schedule_window < 0 )   { $schedule_window = 0; }
-    if ( $schedule_window > 168 ) { $schedule_window = 168; }   /* cap at 1 week */
+    /* Hours 0–168 OR the human "drip:N" mode — the SAME parser as the Bulk-ZIP page + REST (9.47.0, BL-101).
+       A bare (float) cast here turned "drip:N" into 0 ⇒ the whole batch published at once. */
+    $schedule_window = wpap_parse_schedule_window( $_POST['schedule_window'] ?? 0 );
 
     /* Optional default category (name or id) applied when an item has none. */
     $default_category = sanitize_text_field( wp_unslash( $_POST['default_category'] ?? '' ) );
@@ -1151,6 +1182,60 @@ function wpap_bundle_find_posts_json( $root ) {
     return $found;
 }
 
+/** Validate every entry of an opened Bulk-ZIP archive BEFORE anything is extracted. Returns the list of entry
+ *  names that are safe to extract (json + images only), or a WP_Error whose message is shown to the admin (the
+ *  caller then closes the zip and removes the work dir). Guards — same filters, defaults and messages as
+ *  build-final 8.71.0 so the two builds stay diffable: ≤3000 entries (`wpap_bundle_max_entries`); an absolute
+ *  path, drive letter, `../` or NUL refuses the WHOLE zip; Unix-symlink entries refused; per-file uncompressed
+ *  cap 64 MB (`wpap_bundle_max_file_bytes`); compression-ratio bomb > 200:1 on a file > 1 MB
+ *  (`wpap_bundle_max_ratio`); total uncompressed ≤512 MB (`wpap_bundle_max_uncompressed`).
+ *  9.48.0 (BL-116): per-file cap, ratio guard and symlink rejection ported from build-final 8.71.0; the loop was
+ *  lifted out of wpap_ajax_bulk_publish_zip() so it can be tested without a real HTTP upload. */
+function wpap_bundle_safe_entries( ZipArchive $zip ) {
+    $max_entries      = (int) apply_filters( 'wpap_bundle_max_entries', 3000 );
+    $max_uncompressed = (int) apply_filters( 'wpap_bundle_max_uncompressed', 512 * 1024 * 1024 );
+    $max_per_entry    = (int) apply_filters( 'wpap_bundle_max_file_bytes', 64 * 1024 * 1024 );   /* per-file cap: one entry can't OOM us */
+    $max_ratio        = (int) apply_filters( 'wpap_bundle_max_ratio', 200 );                      /* uncompressed:compressed ratio bomb guard */
+    if ( $zip->numFiles > $max_entries ) { return new WP_Error( 'wpap_zip_entries', 'Too many entries in the zip.' ); }
+    $allowed_ext = array( 'json', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif' );
+    $safe        = array();
+    $total_unc   = 0;
+    for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+        $st = $zip->statIndex( $i );
+        if ( ! is_array( $st ) ) { continue; }
+        $name = (string) $st['name'];
+        if ( '' === $name || '/' === substr( $name, -1 ) ) { continue; }   /* directory entry */
+        $norm = str_replace( '\\', '/', $name );
+        if ( '/' === $norm[0] || preg_match( '#^[A-Za-z]:/#', $norm ) || false !== strpos( $norm, '../' ) || false !== strpos( $name, "\0" ) ) {
+            return new WP_Error( 'wpap_zip_path', 'Unsafe path in zip: ' . sanitize_text_field( $name ) );
+        }
+        $ext = strtolower( (string) pathinfo( $norm, PATHINFO_EXTENSION ) );
+        if ( ! in_array( $ext, $allowed_ext, true ) ) { continue; }   /* only json + images are extracted */
+        /* Reject a symlink entry outright (defence-in-depth: never extract one — the realpath-confinement in
+           wpap_bundle_resolve_image also blocks an escape at read time). */
+        $attr = 0; $opsys = 0;
+        if ( method_exists( $zip, 'getExternalAttributesIndex' )
+            && $zip->getExternalAttributesIndex( $i, $opsys, $attr )
+            && defined( 'ZipArchive::OPSYS_UNIX' ) && ZipArchive::OPSYS_UNIX === $opsys
+            && 0xA000 === ( ( (int) $attr >> 16 ) & 0xF000 ) ) {
+            return new WP_Error( 'wpap_zip_symlink', 'Symlink entry rejected: ' . sanitize_text_field( $name ) );
+        }
+        $unc = (int) $st['size'];
+        if ( $unc > $max_per_entry ) {
+            return new WP_Error( 'wpap_zip_file_size', sprintf( 'A file in the zip is too large (%d MB; max %d MB per file).', (int) round( $unc / 1048576 ), (int) round( $max_per_entry / 1048576 ) ) );
+        }
+        /* Per-entry compression-ratio bomb: a tiny compressed blob that explodes to a huge file. */
+        $comp = (int) ( $st['comp_size'] ?? 0 );
+        if ( $comp > 0 && ( $unc / $comp ) > $max_ratio && $unc > 1048576 ) {
+            return new WP_Error( 'wpap_zip_ratio', 'A file in the zip has a suspicious compression ratio (bomb guard).' );
+        }
+        $total_unc += $unc;
+        if ( $total_unc > $max_uncompressed ) { return new WP_Error( 'wpap_zip_total', 'Zip contents exceed the size limit (bomb guard).' ); }
+        $safe[] = $name;
+    }
+    return $safe;
+}
+
 /** Resolve an item's local image path SAFELY inside the extract root (rejects absolute / ..
  *  escapes / symlinks out). Returns an absolute path to a real file inside $root, or ''. */
 function wpap_bundle_resolve_image( $base_dir, $root, $rel ) {
@@ -1298,29 +1383,10 @@ function wpap_ajax_bulk_publish_zip() {
     $zip = new ZipArchive();
     if ( true !== $zip->open( $tmp_upload ) ) { wpap_bundle_rrmdir( $work ); wp_send_json_error( array( 'message' => 'Not a valid zip archive.' ) ); }
 
-    /* ── guards: entry count, path traversal / absolute, allowed types only, uncompressed-size (zip bomb) ── */
-    $max_entries      = (int) apply_filters( 'wpap_bundle_max_entries', 3000 );
-    $max_uncompressed = (int) apply_filters( 'wpap_bundle_max_uncompressed', 512 * 1024 * 1024 );
-    if ( $zip->numFiles > $max_entries ) { $zip->close(); wpap_bundle_rrmdir( $work ); wp_send_json_error( array( 'message' => 'Too many entries in the zip.' ) ); }
-    $allowed_ext = array( 'json', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif' );
-    $safe        = array();
-    $total_unc   = 0;
-    for ( $i = 0; $i < $zip->numFiles; $i++ ) {
-        $st = $zip->statIndex( $i );
-        if ( ! is_array( $st ) ) { continue; }
-        $name = (string) $st['name'];
-        if ( '' === $name || '/' === substr( $name, -1 ) ) { continue; }   /* directory entry */
-        $norm = str_replace( '\\', '/', $name );
-        if ( '/' === $norm[0] || preg_match( '#^[A-Za-z]:/#', $norm ) || false !== strpos( $norm, '../' ) || false !== strpos( $name, "\0" ) ) {
-            $zip->close(); wpap_bundle_rrmdir( $work );
-            wp_send_json_error( array( 'message' => 'Unsafe path in zip: ' . sanitize_text_field( $name ) ) );
-        }
-        $ext = strtolower( (string) pathinfo( $norm, PATHINFO_EXTENSION ) );
-        if ( ! in_array( $ext, $allowed_ext, true ) ) { continue; }   /* only json + images are extracted */
-        $total_unc += (int) $st['size'];
-        if ( $total_unc > $max_uncompressed ) { $zip->close(); wpap_bundle_rrmdir( $work ); wp_send_json_error( array( 'message' => 'Zip contents exceed the size limit (bomb guard).' ) ); }
-        $safe[] = $name;
-    }
+    /* ── guards (wpap_bundle_safe_entries): entry count, path traversal / absolute, allowed types only,
+       symlink entries, per-file size, compression ratio, total uncompressed size (zip bomb). ── */
+    $safe = wpap_bundle_safe_entries( $zip );
+    if ( is_wp_error( $safe ) ) { $zip->close(); wpap_bundle_rrmdir( $work ); wp_send_json_error( array( 'message' => $safe->get_error_message() ) ); }
     if ( empty( $safe ) ) { $zip->close(); wpap_bundle_rrmdir( $work ); wp_send_json_error( array( 'message' => 'The zip has no posts.json or image files.' ) ); }
     if ( ! $zip->extractTo( $work, $safe ) ) { $zip->close(); wpap_bundle_rrmdir( $work ); wp_send_json_error( array( 'message' => 'Extraction failed.' ) ); }
     $zip->close();

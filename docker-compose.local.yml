@@ -1,0 +1,13 @@
+# Local QA only — NOT used by Coolify (compose file docker-compose.yaml only).
+# Run:  export SERVICE_USER_MYSQL=wp SERVICE_PASSWORD_MYSQL=wp SERVICE_PASSWORD_MYSQLROOT=root
+#        docker compose -f docker-compose.yaml -f docker-compose.local.yml up -d --build
+# Site on http://localhost:8095
+services:
+  wordpress:
+    ports:
+      - "8095:80"
+    environment:
+      - SERVICE_FQDN_WORDPRESS_80=localhost:8095
+      - SITE_URL=http://localhost:8095
+      - WP_ADMIN_PASSWORD=localtest123
+      - HISTATS_ID=off

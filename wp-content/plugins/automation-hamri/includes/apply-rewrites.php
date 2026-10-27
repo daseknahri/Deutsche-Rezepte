@@ -80,18 +80,23 @@ function wpap_ajax_apply_rewrites() {
 			if ( ! $post || 'post' !== $post->post_type ) { $skipped++; $messages[] = "Row {$row}: post {$id} not found (or not a post)."; continue; }
 			if ( null === $content && '' === $title ) { $skipped++; $messages[] = "Row {$row}: nothing to update."; continue; }
 
-			/* Back up the ORIGINAL once (first overwrite wins) so revert restores the true pre-rewrite state. */
+			/* Back up the ORIGINAL once (first overwrite wins) so revert restores the true pre-rewrite state.
+			   update_post_meta() wp_unslash()es its value, so the JSON must be wp_slash()ed — otherwise every \"
+			   escape is stripped, the backup is invalid JSON and Revert reports "backup unreadable" (9.47.0, BL-106). */
 			if ( '' === (string) get_post_meta( $id, '_wpap_rewrite_backup', true ) ) {
-				update_post_meta( $id, '_wpap_rewrite_backup', wp_json_encode( array(
+				update_post_meta( $id, '_wpap_rewrite_backup', wp_slash( wp_json_encode( array(
 					'title'   => $post->post_title,
 					'content' => $post->post_content,
 					'time'    => time(),
-				) ) );
+				) ) ) );
 			}
 
+			/* wp_update_post() → wp_insert_post() wp_unslash()es its input (it expects slashed, $_POST-style data),
+			   so the raw JSON values MUST be wp_slash()ed or every literal backslash is silently stripped
+			   (9.47.0, BL-106 — the same contract wpap_publish_article already follows). */
 			$update = array( 'ID' => $id );
-			if ( '' !== $title )      { $update['post_title']   = $title; }
-			if ( null !== $content )  { $update['post_content'] = $content; }
+			if ( '' !== $title )      { $update['post_title']   = wp_slash( $title ); }
+			if ( null !== $content )  { $update['post_content'] = wp_slash( $content ); }
 			/* Suppress the Hub auto-add hook (no status transition on an update, but be safe). */
 			$GLOBALS['wpap_suppress_hub_autoadd'] = true;
 			$res = wp_update_post( $update, true );
@@ -156,7 +161,8 @@ function wpap_ajax_revert_rewrites() {
 			$bak  = json_decode( $json, true );
 			if ( ! is_array( $bak ) || ! isset( $bak['content'] ) ) { $messages[] = "Post {$id}: backup unreadable."; continue; }
 			$GLOBALS['wpap_suppress_hub_autoadd'] = true;
-			$res = wp_update_post( array( 'ID' => $id, 'post_title' => (string) ( $bak['title'] ?? '' ), 'post_content' => (string) $bak['content'] ), true );
+			/* Slashed: core unslashes wp_update_post() input (BL-106). */
+			$res = wp_update_post( array( 'ID' => $id, 'post_title' => wp_slash( (string) ( $bak['title'] ?? '' ) ), 'post_content' => wp_slash( (string) $bak['content'] ) ), true );
 			unset( $GLOBALS['wpap_suppress_hub_autoadd'] );
 			if ( is_wp_error( $res ) ) { $messages[] = "Post {$id}: revert failed — " . $res->get_error_message(); continue; }
 			delete_post_meta( $id, '_wpap_rewrite_backup' );

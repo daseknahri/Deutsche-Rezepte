@@ -3,6 +3,74 @@
 Newest-first. build-v9 is the modular (`includes/*.php`), full-featured product that keeps its
 front-end (SEO/ads/recipe). See `readme.txt` for the WordPress-directory changelog.
 
+## 9.48.0
+
+**Safety parity with build-final (BL-116, BL-119).** No setting default changed. ONE behaviour change is on by
+default, and it is a correctness fix:
+
+> ⚠ **Re-sending an item with the same `id` is now skipped on every route.** `wpap_publish_article()` adopts the
+> item's `id` as its durable dedup key (`_wpap_source_key`) when the caller supplies none (Direct Publish, Bulk ZIP,
+> REST), and skips the item — `skipped: already published (id/key exists as post #N).` (`wpap_duplicate`) — when a
+> NON-trashed post already carries that key. This is independent of "Skip duplicate titles" (still **default OFF**
+> here, BL-104 untouched) and only ever matches an exact re-send of the same id. Items without an `id` behave
+> exactly as before. A trashed original does not block a re-publish. Posts published by ≤ 9.47 carry no key, so
+> re-sending a batch published BEFORE this version can still duplicate them once.
+
+### Fixed
+- **Bulk-ZIP input hardening (BL-116, security — ported from build-final 8.71.0).** On top of the existing
+  entry-count / traversal / allow-list / total-size / `realpath` confinement checks, every entry is now also checked
+  for: a per-file uncompressed cap of 64 MB (`wpap_bundle_max_file_bytes`), a compression-ratio bomb (> 200:1 on a
+  file > 1 MB, `wpap_bundle_max_ratio`), and Unix-symlink entries (rejected outright). Same filters, defaults and
+  error messages as build-final. The entry loop moved out of `wpap_ajax_bulk_publish_zip()` into
+  `wpap_bundle_safe_entries( ZipArchive )` (returns the safe names or a `WP_Error`) so it is testable without an
+  HTTP upload; the handler's behaviour is otherwise unchanged.
+- **Item `id` dedup (BL-119, ported from build-final).** See the note above. The "Skip duplicate titles" guard keeps
+  its exact old scope (it is bypassed only by a caller-supplied key, i.e. the Sheet automation — not by an adopted
+  item `id`). A Sheet row and a Direct-Publish item that share an `id` now count as the same article (the Sheet's
+  row key IS the `id` column), so neither route re-creates the other's post.
+
+### Tests
+- `tools/smoke/fixes-v9.php`: same `id` sent twice via the real Direct Publish handler → one post; same `id` twice
+  in one batch → one post; no-`id` items unchanged; re-publish after trash; ZIP guard rejects a ratio bomb, a symlink
+  entry, an over-cap file and a `../` path, and passes a normal bundle.
+
+## 9.47.0
+
+**Engine bug-fix release (BL-101/102/103/105/106).** No setting default changed; nothing new is ON by default.
+
+### Fixed
+- **Direct Publish now honours `drip:N` (BL-101).** `wpap_ajax_bulk_publish_posts` cast `schedule_window` to
+  `(float)`, so `"drip:N"` became `0` and the whole batch published at once. It now uses
+  `wpap_parse_schedule_window()` — the same parser as the Bulk-ZIP page and REST (hours 0–168 or `drip:N`, N 1–100).
+  The Direct Publish "Schedule" menu gains a "Human drip" group (~30/20/12/6 per day); the default stays
+  "Spread over 6h". The confirm dialog names the drip cadence. (Sheet automation is still hours-only.)
+- **`[nextpage]` tokens are converted (BL-102).** Ported build-final's `wpap_apply_content_pagebreaks()`
+  (`includes/scheduling.php`) verbatim and call it first in `wpap_publish_article()` (before internal-link
+  resolution and the equal-parts splitter), so `[nextpage]` / `[next-page]` / `[next page]` / `[next_page]`
+  (case-insensitive, an enclosing `<p>` stripped) become `<!--nextpage-->` on every publish path (Direct
+  Publish, Bulk ZIP, REST, Sheet). A token wins over the "parts" option, as the help text already said.
+- **Google-Sheet fetch hardening (BL-103, ported from build-final 8.76.0).** Response cap 5 MB → 24 MB
+  (filter `wpap_sheet_max_bytes`, floor 1 MB), timeout 10 s → 20 s, and a truncation guard: a body that
+  reaches the cap fails the run with `wpap_truncated` instead of publishing a corrupted tail row.
+- **Apply Rewrites keeps backslashes, and Revert works (BL-106).** `wp_update_post()` → `wp_insert_post()`
+  `wp_unslash()`es its input, so rewrite titles/bodies are now `wp_slash()`ed (apply AND revert). The same
+  root cause broke the backup: `update_post_meta()` unslashes too, so the JSON backup lost every `\"` escape
+  and became unreadable ("backup unreadable" on Revert) whenever the original body contained a quote — the
+  backup JSON is now `wp_slash()`ed. Backups written by ≤ 9.46 are not recoverable by code.
+- **Opt-in uninstall purge is complete (BL-105).** With `WPAP_UNINSTALL_PURGE` set, uninstall now also drops
+  the `wpap_tombstones` table and deletes the social-poster options (`wpap_fbpage` — holds the Page token —
+  `wpap_fbp_page_name/_paused/_log/_day`, `wpap_igpage`, `wpap_igp_paused/_day`, `wpap_pinterest`,
+  `wpap_pin_flush_rules`, `wpap_tomb_migrated`), the poster back-off transients and the `wpap_fbp_cron` hook.
+  A default (non-purge) uninstall is unchanged.
+
+## 9.46.0
+
+**Settings-page UX ported from build-final (presentation only).** No option key, default or save handler changed.
+
+### Added
+- `includes/admin-ui.php`: shared `wpap_help_tip()` (moved here from `facebook-page-admin.php`, still `function_exists`-guarded), collapsible-group helpers, shared CSS and a sticky "On this page" nav with scroll-spy.
+- The main settings page is now grouped into collapsible `<details class="wpap-group">` sections (API keys open by default, the rest closed), and every setting row has a hover-help tip with plain-English, step-by-step directions (registered via `wpap_help_tips_extra`).
+
 ## 9.44.0
 
 **Instagram auto-poster + Pinterest pins, ported from build-final 8.87 / 8.82.** Both opt-in and OFF by default; nothing

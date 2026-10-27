@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       - SERVICE_FQDN_WORDPRESS_80
-      - SITE_URL=${SITE_URL:-https://lebensecht.getemoji.site}
+      - SITE_URL=${SITE_URL:-https://deutsche-rezepte.getemoji.site}
       - WORDPRESS_DB_HOST=db
       - WORDPRESS_DB_NAME=wordpress
       - WORDPRESS_DB_USER=$SERVICE_USER_MYSQL
@@ -13,6 +13,7 @@ services:
       - WP_ADMIN_PASSWORD=$SERVICE_PASSWORD_WPADMIN
       - WP_ADMIN_EMAIL=${WP_ADMIN_EMAIL:-daseknahri@gmail.com}
       - ADSENSE_CLIENT=${ADSENSE_CLIENT:-ca-pub-6869205417923902}
+      - HISTATS_ID=${HISTATS_ID:-off}
     volumes:
       - wp-data:/var/www/html
     depends_on:

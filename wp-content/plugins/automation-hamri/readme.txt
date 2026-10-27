@@ -4,22 +4,25 @@ Tags: content, automation, adsense, seo, publishing
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 9.45.2
+Stable tag: 9.48.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI-assisted bulk content publishing with a Distribution Hub, Google-Sheet automation, an AdSense ad manager, and built-in SEO/structured-data output.
+Bulk content publishing with a Distribution Hub, Google-Sheet automation, an AdSense ad manager, built-in SEO/structured-data output, and opt-in Facebook / Instagram / Pinterest distribution.
 
 == Description ==
 
-Automation Hamri turns ready-made content into published WordPress posts at scale and keeps the front-end SEO/ads plumbing consistent:
+Automation Hamri turns ready-made content into published WordPress posts at scale and keeps the front-end SEO/ads plumbing consistent. Publishing needs no AI and no external API:
 
-* **Bulk publishing** — Direct Publish from JSON (one item per request for reliability) and a Distribution Hub to manage every published item.
-* **Google-Sheet automation** — poll a published-CSV sheet on an hourly cron and drip posts out in submission order, deduplicated so a row is published once and never recreated.
+* **Bulk publishing** — Direct Publish from JSON, Bulk ZIP Publish (a `posts.json` plus the image files, including images inside the article body), Google-Sheet automation and a REST endpoint all run one shared publisher, with ordered or "human drip" scheduling. A Distribution Hub lists every published item with its Facebook caption, first-comment text, image and link.
+* **Google-Sheet automation** — poll a published-CSV sheet on an hourly cron and drip posts out, deduplicated so a row is published once and never recreated.
 * **AdSense ad manager** — header/sidebar/footer zones, in-content injection with a density guardrail, a live placement preview, an earnings estimator, and a thin-content safety net; ads.txt served from your publisher ID.
-* **SEO & structured data** — Open Graph / Twitter cards, meta descriptions, Article + BreadcrumbList JSON-LD, related-posts block, and a theme-independent Recipe card + Recipe schema. Defers automatically to Yoast / Rank Math / AIOSEO / SEOPress / The SEO Framework when one is active.
-* **Internal linking** — in-content cross-links that lift crawl depth and pages-per-session: `[[link:slug]]` writer tokens (self-healing across a batch) plus keyword-based auto-linking, both baked in on publish.
+* **SEO & structured data** — Open Graph / Twitter cards, meta descriptions, one connected Article / Person / Organization / BreadcrumbList JSON-LD graph, noindex control, related-posts block, and a theme-independent Recipe card + Recipe schema. Defers automatically to Yoast / Rank Math / AIOSEO / SEOPress / The SEO Framework when one is active.
+* **Internal linking** — in-content cross-links that lift crawl depth and pages-per-session: `[[link:slug]]` writer tokens (self-healing across a batch) plus keyword-based auto-linking, baked in after a Direct Publish or Bulk ZIP run and available as buttons for existing catalogues.
+* **Social distribution (opt-in, off by default)** — post each new article to a Facebook Page (photo + caption, link in the first comment), share to a linked Instagram account, and publish a Pinterest RSS feed / bulk-upload CSV.
+* **Editing tools** — Author Tools meta box, Apply Rewrites (update live posts in place with backup and revert) and near-duplicate cleanup.
 * **Instant indexing (IndexNow)** — opt-in (off by default); pings Bing/Yandex on publish once enabled in Settings.
+* **Optional AI generator** — the original Claude / Gemini / Pexels bulk generator is still available and only used if you add API keys.
 
 The plugin pairs with the companion "Viral Reader" theme but works on any theme.
 
@@ -34,12 +37,23 @@ Note: on some hosts (OPcache), overwriting the plugin folder in place may not re
 == Frequently Asked Questions ==
 
 = Does it send data anywhere by default? =
-No. Instant indexing (IndexNow) is opt-in and off until you enable it. License and image-source requests only run for features you configure.
+No. Instant indexing (IndexNow), Facebook / Instagram / Pinterest posting and the AI generators are all opt-in and do nothing until you enable them and enter your own tokens or API keys. There is no licence check. Remote images are only fetched from the URLs you publish, and the Google-Sheet automation only reads the CSV link you give it.
+
+= Does publishing need an API key? =
+No. Direct Publish, Bulk ZIP, the Google-Sheet automation and the REST endpoint publish your ready-made content without any AI or external API. Keys are only for the optional AI generator.
+
+= Does it replace my SEO plugin? =
+No. When Yoast, Rank Math, All in One SEO, SEOPress or The SEO Framework is active, the plugin's own meta/Open Graph/schema output stands aside and it writes the title, description and focus keyword into that plugin instead.
 
 = Does it require a specific theme? =
 No. It renders its own ad zones and SEO/recipe output on any theme, and defers to a dedicated SEO plugin if one is active.
 
 == Changelog ==
+
+= 9.48.0 =
+* Fix: re-sending a post with the same `id` (Direct Publish, Bulk ZIP, REST) is now skipped instead of creating a duplicate — always on, independent of "Skip duplicate titles". Posts without an `id` behave as before.
+* Security: Bulk ZIP Publish rejects symlink entries, files over 64 MB and zip-bomb compression ratios (ported from the panrecipe build).
+* Full history: CHANGELOG.md.
 
 = 9.28.1 =
 * Fix: the 9.28.0 keyword auto-linker could, within one paragraph, insert a link inside another link's URL (a nested, broken anchor). The linker no longer re-scans text it just linked. A built-in repair pass fixes any posts already affected — just re-open Settings → Internal linking and click "Activate on existing posts" (it repairs first, then re-links cleanly, and reports how many posts it fixed).
