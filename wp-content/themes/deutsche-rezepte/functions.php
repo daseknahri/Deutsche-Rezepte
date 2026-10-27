@@ -11,7 +11,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'DR_VERSION', '1.0.0' );
+define( 'DR_VERSION', '1.1.0' );
 define( 'DR_FB_PAGE', 'https://www.facebook.com/profile.php?id=61595540835887' );
 
 define( 'DR_HERO_SIZES', '(max-width:1200px) 100vw, 1200px' );
@@ -96,6 +96,8 @@ function dr_icon( $name ) {
 		'fb'    => '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.6-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4v2.2H7.9v3h2.6V21h3z"/></svg>',
 		'wa'    => '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3zm4.6 12.6c-.2.6-1.1 1.1-1.6 1.2-.4.1-1 .1-1.6-.1-.4-.1-.9-.3-1.5-.6-2.6-1.1-4.3-3.8-4.4-4-.1-.2-1-1.4-1-2.6s.6-1.9.9-2.1c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 1.9 1.1.9 2 1.2 2.3 1.4.3.1.4.1.6-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3z"/></svg>',
 		'arrow' => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+		'print' => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg>',
+		'plus'  => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
 	);
 	return $icons[ $name ] ?? '';
 }
@@ -115,9 +117,35 @@ add_filter( 'the_content', function ( $content ) {
 	$out .= '<div class="dr-end__actions">';
 	$out .= '<a class="dr-btn dr-btn--fb" href="https://www.facebook.com/sharer/sharer.php?u=' . $url . '" target="_blank" rel="noopener nofollow">' . dr_icon( 'fb' ) . 'Auf Facebook teilen</a>';
 	$out .= '<a class="dr-btn dr-btn--wa" href="https://wa.me/?text=' . $url . '" target="_blank" rel="noopener nofollow">' . dr_icon( 'wa' ) . 'Per WhatsApp senden</a>';
+	$out .= '<button type="button" class="dr-btn dr-btn--print" data-dr-print>' . dr_icon( 'print' ) . 'Rezept drucken</button>';
+	$out .= '<span class="dr-share"><button type="button" class="dr-btn dr-btn--more" data-dr-more aria-haspopup="true" aria-expanded="false">' . dr_icon( 'plus' ) . 'Mehr</button>';
+	$title   = rawurlencode( get_the_title( $id ) );
+	$img     = rawurlencode( (string) get_the_post_thumbnail_url( $id, 'large' ) );
+	$out    .= '<span class="dr-share__pop" role="menu">';
+	$out    .= '<a role="menuitem" href="https://pinterest.com/pin/create/button/?url=' . $url . '&media=' . $img . '&description=' . $title . '" target="_blank" rel="noopener nofollow">Auf Pinterest pinnen</a>';
+	$out    .= '<a role="menuitem" href="https://t.me/share/url?url=' . $url . '&text=' . $title . '" target="_blank" rel="noopener nofollow">Per Telegram senden</a>';
+	$out    .= '<a role="menuitem" href="https://twitter.com/intent/tweet?url=' . $url . '&text=' . $title . '" target="_blank" rel="noopener nofollow">Auf X teilen</a>';
+	$out    .= '<a role="menuitem" href="mailto:?subject=' . $title . '&body=' . $url . '">Per E-Mail senden</a>';
+	$out    .= '<button type="button" role="menuitem" data-dr-copy>Link kopieren</button>';
+	$out    .= '</span></span>';
 	$out .= '</div>';
 	$out .= '<p class="dr-follow">Mehr deutsche Rezepte gibt es auf <a href="' . esc_url( DR_FB_PAGE ) . '" target="_blank" rel="noopener nofollow">Facebook</a> – folge uns, damit du kein Rezept verpasst.</p>';
 	$out .= '</aside>';
+
+	/* Print + share-more behaviour (printed once per page). */
+	static $dr_share_js = false;
+	if ( ! $dr_share_js ) {
+		$dr_share_js = true;
+		$out .= '<script>(function(){if(window.__drShare)return;window.__drShare=1;document.addEventListener("click",function(e){'
+			. 'var p=e.target.closest("[data-dr-print]");if(p){e.preventDefault();window.print();return;}'
+			. 'var m=e.target.closest("[data-dr-more]");var s=m&&m.closest(".dr-share");'
+			. 'document.querySelectorAll(".dr-share.is-open").forEach(function(o){if(o!==s)o.classList.remove("is-open");});'
+			. 'if(m&&s){e.preventDefault();s.classList.toggle("is-open");m.setAttribute("aria-expanded",s.classList.contains("is-open"));}else if(!e.target.closest(".dr-share__pop")){document.querySelectorAll(".dr-share.is-open").forEach(function(o){o.classList.remove("is-open");});}'
+			. 'var c=e.target.closest("[data-dr-copy]");if(c){e.preventDefault();var t=document.title+" – "+location.href;'
+			. 'function done(){c.textContent="Kopiert!";setTimeout(function(){c.textContent="Link kopieren";},1500);}'
+			. 'if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,done);}else{var i=document.createElement("textarea");i.value=t;document.body.appendChild(i);i.select();try{document.execCommand("copy");}catch(x){}document.body.removeChild(i);done();}}'
+			. '});document.addEventListener("keydown",function(e){if(e.key==="Escape"){document.querySelectorAll(".dr-share.is-open").forEach(function(o){o.classList.remove("is-open");});}});})();</script>';
+	}
 
 	$next = dr_next_story( $id );
 	if ( $next ) {
