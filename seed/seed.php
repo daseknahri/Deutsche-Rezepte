@@ -236,6 +236,9 @@ function dr_import_bundles() {
 			if ( $img && 0 === strpos( $img, realpath( $work ) ) ) { $opts['local_image_path'] = $img; }
 			$id = wpap_publish_article( $item, $opts );
 			if ( is_wp_error( $id ) ) { dr_log( 'skip: ' . $id->get_error_message() ); continue; }
+			/* build-v9 derives the permalink from the title and ignores item slug — pin the
+			   planned slug so the resume check above and [[link:slug]] tokens stay valid. */
+			if ( $slug ) { wp_update_post( array( 'ID' => (int) $id, 'post_name' => $slug ) ); }
 			$q = dr_question_from_comment( $item['comment'] ?? '' );
 			if ( '' !== $q ) { update_post_meta( (int) $id, '_dr_question', $q ); }
 			$n++;
