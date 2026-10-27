@@ -6,26 +6,27 @@
 
 /* ===== Brand tokens (the parent theme is fully token-driven) ===== */
 :root{
-  /* Deutsche Rezepte: brick red #9C2B2E (brand), warm cream paper, dark roast ink, herb-green accents */
-  --paper:#FBF6EA; --paper-soft:#F4EBDD; --surface:#FFFFFF;
-  --ink:#2B2118; --muted:#6E6255;
-  --olive:#9C2B2E; --olive-dark:#7C1F22; --copper:#9C2B2E; --clay:#7C1F22; --sage:#F4EBDD;
-  --eyebrow:#8C2A2D; --line:#E7DCC8; --ad-label:#8A7D6B;
-  --footer:#241B12; --footer-ink:rgba(251,246,234,.86); --footer-hover:#F0C9A0;
-  --hero-bg:#241B12; --hero-eyebrow:#F3D9A0; --hero-rule:#D9A75E; --on-dark:#FFFBF2;
+  /* Deutsche Rezepte 1.2 — taken from the Facebook page's brand imagery:
+     deep pine green #2F4A3A (the chef's kitchen), warm cream paper, brass/copper accent */
+  --paper:#FAF6EC; --paper-soft:#F0EBDC; --surface:#FFFFFF;
+  --ink:#1F2620; --muted:#5F6A60;
+  --olive:#2F4A3A; --olive-dark:#24382C; --copper:#B0793A; --clay:#24382C; --sage:#E9EEE7;
+  --eyebrow:#2F4A3A; --line:#E4DFCC; --ad-label:#7C877C;
+  --footer:#1A211C; --footer-ink:rgba(250,246,236,.86); --footer-hover:#D8C9A3;
+  --hero-bg:#1A211C; --hero-eyebrow:#E9D9AC; --hero-rule:#C9A96A; --on-dark:#FFFBF2;
   --serif:"Literata",Georgia,"Times New Roman",serif;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   --measure:660px;
   /* Category colours, one per recipe pillar (fixed slugs set by the seed) */
-  --mood-klassiker:#9C2B2E; --mood-schnell:#C77B29; --mood-suppe:#3F6A5C; --mood-backen:#8A5A2E; --mood-veggie:#4A7A3A;
+  --mood-klassiker:#2F4A3A; --mood-schnell:#C77B29; --mood-suppe:#8A5A2E; --mood-backen:#B0793A; --mood-veggie:#7A9B4E;
 }
 
 /* Night reading: follows the phone's dark mode (many readers scroll FB in bed). */
 @media (prefers-color-scheme:dark){
   :root{
-    --paper:#1D1710; --paper-soft:#2A2118; --surface:#312820;
-    --ink:#F5EFE2; --muted:#C4B7A3; --olive:#E59A97; --olive-dark:#F0B8B4; --copper:#E59A97; --clay:#F0B8B4;
-    --sage:#382D1F; --eyebrow:#E59A97; --line:rgba(245,239,226,.13); --ad-label:#C4B7A3;
+    --paper:#151B17; --paper-soft:#222B25; --surface:#26312A;
+    --ink:#F0F4EC; --muted:#ACB8AC; --olive:#A9CDB7; --olive-dark:#C6DECD; --copper:#D9B380; --clay:#C6DECD;
+    --sage:#26312A; --eyebrow:#A9CDB7; --line:rgba(240,244,236,.13); --ad-label:#ACB8AC;
     color-scheme:dark;
   }
 }
@@ -84,20 +85,20 @@ body{font-family:var(--serif)}
 /* Sticky "next recipe" bar on phones — appears near the end of the recipe.
    ALWAYS dark (fixed colors, not the theme tokens): the text colors below are light-on-dark
    and must not invert when the rest of the page flips to dark mode. */
-.dr-bar{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;display:flex;align-items:center;gap:.7rem;padding:.6rem .7rem;border-radius:16px;background:#241B12;color:#FBF6EA;box-shadow:0 14px 40px rgba(0,0,0,.28);font-family:var(--sans);text-decoration:none;transform:translateY(140%);transition:transform .35s ease}
+.dr-bar{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;display:flex;align-items:center;gap:.7rem;padding:.6rem .7rem;border-radius:16px;background:#1A211C;color:#FAF6EC;box-shadow:0 14px 40px rgba(0,0,0,.28);font-family:var(--sans);text-decoration:none;transform:translateY(140%);transition:transform .35s ease}
 .dr-bar.is-on{transform:none}
 .dr-bar img{width:48px;height:48px;border-radius:10px;object-fit:cover;flex:none}
 .dr-bar__t{font-size:.86rem;line-height:1.25;flex:1;min-width:0}
 .dr-bar__t b{display:block;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:#F3D9A0}
 .dr-bar__t span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#FFFBF2}
-.dr-bar__go{flex:none;width:36px;height:36px;border-radius:50%;background:#9C2B2E;display:grid;place-items:center;color:#fff}
+.dr-bar__go{flex:none;width:36px;height:36px;border-radius:50%;background:#B0793A;display:grid;place-items:center;color:#fff}
 .dr-bar__x{flex:none;background:none;border:0;color:#cbb;font-size:1.3rem;line-height:1;padding:.2rem .3rem;cursor:pointer}
 @media (min-width:900px){.dr-bar{left:auto;right:24px;bottom:24px;width:360px}}
 @media (prefers-reduced-motion:reduce){.dr-bar{transition:none}}
 
 /* ===== Print + share-more (end of recipe) ===== */
 .dr-btn--print{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
-.dr-btn--more{background:#9C2B2E;color:#fff}
+.dr-btn--more{background:#2F4A3A;color:#fff}
 .dr-share{position:relative;display:inline-flex}
 .dr-share__pop{position:absolute;bottom:calc(100% + 10px);right:0;z-index:70;display:none;flex-direction:column;gap:2px;min-width:190px;padding:.5rem;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.22);text-align:left}
 .dr-share.is-open .dr-share__pop{display:flex}
@@ -187,13 +188,13 @@ body{font-family:var(--serif)}
 /* ===== Deutsche Rezepte brand layer ===== */
 /* Home hero: the rustic German-dishes table scene; the parent's near-black gradient would muddy the
    warm picture, so it is replaced by a dark-roast veil that only darkens the text side. Fixed image box = no layout shift. */
-.home-hero::after{background:linear-gradient(94deg,rgba(36,27,18,.9),rgba(36,27,18,.66) 48%,rgba(36,27,18,.05) 82%),linear-gradient(0deg,var(--paper),transparent 30%)}
+.home-hero::after{background:linear-gradient(94deg,rgba(26,33,28,.9),rgba(26,33,28,.66) 48%,rgba(26,33,28,.05) 82%),linear-gradient(0deg,var(--paper),transparent 30%)}
 .home-hero__img{object-position:50% center}
 @media (max-width:700px){
-  .home-hero::after{background:linear-gradient(180deg,rgba(36,27,18,.82),rgba(36,27,18,.7) 60%,rgba(36,27,18,.3)),linear-gradient(0deg,var(--paper),transparent 25%)}
+  .home-hero::after{background:linear-gradient(180deg,rgba(26,33,28,.82),rgba(26,33,28,.7) 60%,rgba(26,33,28,.3)),linear-gradient(0deg,var(--paper),transparent 25%)}
 }
-.home-hero .vr-btn{background:#FFFBF2;color:#7C1F22}
-.home-hero .vr-btn:hover{background:#fff;color:#5C1416}
+.home-hero .vr-btn{background:#FFFBF2;color:#24382C}
+.home-hero .vr-btn:hover{background:#fff;color:#1A211C}
 
 /* Home intro strip */
 .dr-intro{margin:.9rem 0 0}

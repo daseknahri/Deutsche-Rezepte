@@ -8,7 +8,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-const DR_SEED_VERSION = 1;   /* 1 = Deutsche Rezepte launch (brand, German recipe categories, pages, author, ads) */
+const DR_SEED_VERSION = 2;   /* 2 = brand sync with the Facebook page (chef avatar/intro, page voice in About) */
 const DR_SEED_FB      = 'https://www.facebook.com/profile.php?id=61595540835887';
 const DR_AUTHOR_BIO   = 'Die Redaktion von Deutsche Rezepte kocht, backt und sammelt die besten deutschen Rezepte – von Schnitzel und Käsespätzle bis zur Schwarzwälder Kirschtorte, mit klaren Schritt-für-Schritt-Anleitungen zum Nachkochen.';
 const DR_DATA         = '/opt/site/data';
@@ -49,7 +49,7 @@ function dr_page( $slug, $title, $html, $status = 'publish' ) {
 function dr_seed_author() {
 	$uid = dr_admin_id();
 	wp_update_user( array( 'ID' => $uid, 'display_name' => 'Redaktion Deutsche Rezepte', 'nickname' => 'Redaktion', 'description' => DR_AUTHOR_BIO ) );
-	$avatar = dr_brand_media( 'deutsche-rezepte-icon-512.png', 'Deutsche Rezepte' );
+	$avatar = dr_brand_media( 'chef-avatar.jpg', 'Dein Koch von Deutsche Rezepte' );
 	if ( $avatar ) { update_user_meta( $uid, 'vr_author_avatar', $avatar ); }
 	update_user_meta( $uid, 'vr_social_facebook', DR_SEED_FB );
 }
@@ -74,7 +74,7 @@ function dr_seed_site() {
 
 	$icon = dr_brand_media( 'deutsche-rezepte-icon-512.png', 'Deutsche Rezepte Icon' );
 	if ( $icon ) { update_option( 'site_icon', $icon ); }
-	$logo = dr_brand_media( 'deutsche-rezepte-logo.png', 'Deutsche Rezepte Logo' );
+	$logo = dr_brand_media( 'deutsche-rezepte-logo-v12.png', 'Deutsche Rezepte Logo' );
 	if ( $logo ) { set_theme_mod( 'custom_logo', $logo ); update_option( 'site_logo', $logo ); }
 
 	/* WordPress sample content. */
@@ -103,8 +103,8 @@ function dr_seed_site() {
 	/* Pages */
 	$site = home_url( '/' );
 	dr_page( 'ueber-uns', 'Über uns',
-		'<p><strong>Deutsche Rezepte:</strong> Authentische deutsche Rezepte zum Nachkochen – von Schnitzel, Currywurst und Käsespätzle bis zur Schwarzwälder Kirschtorte. Jedes Rezept wird von unserer Redaktion ausprobiert, mit klaren Schritt-für-Schritt-Anleitungen und Zutaten aus dem nächsten Supermarkt aufgeschrieben.</p>'
-		. '<p>Du findest uns jeden Tag mit neuen Rezepten auf <a href="' . DR_SEED_FB . '" rel="noopener nofollow">Facebook</a> – das Rezept zum Video gibt es hier auf der Seite, ganz ohne Anmeldung.</p>' );
+		'<p><strong>Authentische deutsche Rezepte zum Nachkochen!</strong> Bei uns gibt es Schnitzel, Currywurst, Käsespätzle, Schwarzwälder Kirschtorte &amp; mehr — genau wie auf unserer <a href="' . DR_SEED_FB . '" rel="noopener nofollow">Facebook-Seite</a>. Das Rezept findest du am Ende jedes Videos hier auf der Seite, Schritt für Schritt aufgeschrieben.</p>'
+		. '<p>Jedes Rezept wird von unserer Redaktion nachgekocht und mit Zutaten aus dem nächsten Supermarkt aufgeschrieben. Keine Anmeldung, kein Abo — einfach Rezept öffnen und loslegen.</p>' );
 	dr_page( 'kontakt', 'Kontakt',
 		'<p>Du hast eine Frage zu einem Rezept, einen Tipp oder eine Rückmeldung? Schreib uns über die <a href="' . DR_SEED_FB . '" rel="noopener nofollow">Facebook-Seite von Deutsche Rezepte</a> – wir lesen jede Nachricht.</p>' );
 	$privacy = dr_page( 'datenschutz', 'Datenschutzerklärung',

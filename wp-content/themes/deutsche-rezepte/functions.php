@@ -11,7 +11,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'DR_VERSION', '1.1.0' );
+define( 'DR_VERSION', '1.2.0' );
 define( 'DR_FB_PAGE', 'https://www.facebook.com/profile.php?id=61595540835887' );
 
 define( 'DR_HERO_SIZES', '(max-width:1200px) 100vw, 1200px' );
@@ -204,7 +204,7 @@ add_action( 'wp_head', function () {
 	echo '<meta property="og:image" content="' . esc_url( dr_asset( 'brand/og.jpg' ) ) . '">' . "\n";
 	echo '<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">' . "\n";
 	echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
-	echo '<meta name="theme-color" content="#9C2B2E">' . "\n";
+	echo '<meta name="theme-color" content="#2F4A3A">' . "\n";
 	if ( is_front_page() || is_category() ) { echo '<meta name="description" content="' . esc_attr( $desc ) . '">' . "\n"; }
 }, 5 );
 
@@ -304,15 +304,16 @@ add_action( 'wp_head', function () {
 	echo '<script type="application/ld+json">' . wp_json_encode( $org, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . "</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- JSON-encoded
 }, 24 );
 
-/* ---------- Home intro (brand voice) ----------
-   One compact, server-rendered strip on the first home page (fixed-size mark: no layout shift). Printed
-   from header.php, under the header ad. */
+/* ---------- Home intro (brand voice — the same text as the Facebook page) ----------
+   One compact, server-rendered strip on the first home page (fixed-size portrait: no layout
+   shift). Printed from header.php, under the header ad. The chef photo is the page's own
+   profile/cover image, so the site and the Facebook page read as one brand. */
 function dr_home_intro() {
 	if ( ! is_front_page() || is_paged() ) { return; }
 	echo '<section class="dr-intro" aria-label="Über Deutsche Rezepte"><div class="vr-container dr-intro__in">';
-	echo '<img class="dr-intro__img" src="' . esc_url( dr_asset( 'brand/deutsche-rezepte-icon-512.png' ) ) . '" alt="Deutsche Rezepte" width="64" height="64" loading="lazy" decoding="async">';
+	echo '<img class="dr-intro__img" src="' . esc_url( dr_asset( 'brand/chef-avatar.webp' ) ) . '" alt="Dein Koch von Deutsche Rezepte" width="64" height="64" loading="lazy" decoding="async">';
 	echo '<div class="dr-intro__t"><p class="dr-intro__h">Authentische deutsche Rezepte zum Nachkochen</p>';
-	echo '<p class="dr-intro__s">Jeden Tag ein neues Rezept: Schnitzel, Käsespätzle, Schwarzwälder Kirschtorte und mehr – mit Video auf <a href="' . esc_url( DR_FB_PAGE ) . '" target="_blank" rel="noopener nofollow">Facebook</a> und der Schritt-für-Schritt-Anleitung hier.</p></div>';
+	echo '<p class="dr-intro__s">Schnitzel, Currywurst, Käsespätzle, Schwarzwälder Kirschtorte &amp; mehr — das Rezept zum Video gibt es hier, Schritt für Schritt. <a href="' . esc_url( DR_FB_PAGE ) . '" target="_blank" rel="noopener nofollow">Facebook</a></p></div>';
 	echo '</div></section>';
 }
 
@@ -376,8 +377,8 @@ add_action( 'wp_enqueue_scripts', function () {
    The seed stores the PNG logo as the custom logo; serve the WebP twin from the theme instead (13 KB vs 35 KB).
    A <picture> with a prefers-color-scheme:dark source means exactly one logo file is fetched per visitor. */
 add_filter( 'get_custom_logo', function ( $html ) {
-	$img = '<img width="586" height="96" src="' . esc_url( dr_asset( 'brand/deutsche-rezepte-logo.webp' ) ) . '" class="custom-logo" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '" decoding="async" />';
-	$pic = '<picture><source media="(prefers-color-scheme:dark)" srcset="' . esc_url( dr_asset( 'brand/logo-light.webp' ) ) . '">' . $img . '</picture>';
+	$img = '<img width="586" height="96" src="' . esc_url( dr_asset( 'brand/deutsche-rezepte-logo-v12.webp' ) ) . '" class="custom-logo" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '" decoding="async" />';
+	$pic = '<picture><source media="(prefers-color-scheme:dark)" srcset="' . esc_url( dr_asset( 'brand/logo-light-v12.webp' ) ) . '">' . $img . '</picture>';
 	/* Replace only the <img> (core would keep a PNG srcset the browser prefers over our src). */
 	return preg_replace( '#<img\b[^>]*>#', $pic, $html, 1 );
 } );
