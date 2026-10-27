@@ -8,7 +8,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-const DR_SEED_VERSION = 2;   /* 2 = brand sync with the Facebook page (chef avatar/intro, page voice in About) */
+const DR_SEED_VERSION = 3;   /* 2 = brand sync with the Facebook page (chef avatar/intro, page voice in About); 3 = face-centered chef avatar (chef-avatar-v2) */
 const DR_SEED_FB      = 'https://www.facebook.com/profile.php?id=61595540835887';
 const DR_AUTHOR_BIO   = 'Die Redaktion von Deutsche Rezepte kocht, backt und sammelt die besten deutschen Rezepte – von Schnitzel und Käsespätzle bis zur Schwarzwälder Kirschtorte, mit klaren Schritt-für-Schritt-Anleitungen zum Nachkochen.';
 const DR_DATA         = '/opt/site/data';
@@ -49,7 +49,7 @@ function dr_page( $slug, $title, $html, $status = 'publish' ) {
 function dr_seed_author() {
 	$uid = dr_admin_id();
 	wp_update_user( array( 'ID' => $uid, 'display_name' => 'Redaktion Deutsche Rezepte', 'nickname' => 'Redaktion', 'description' => DR_AUTHOR_BIO ) );
-	$avatar = dr_brand_media( 'chef-avatar.jpg', 'Dein Koch von Deutsche Rezepte' );
+	$avatar = dr_brand_media( 'chef-avatar-v2.jpg', 'Dein Koch von Deutsche Rezepte' );
 	if ( $avatar ) { update_user_meta( $uid, 'vr_author_avatar', $avatar ); }
 	update_user_meta( $uid, 'vr_social_facebook', DR_SEED_FB );
 }

@@ -311,7 +311,7 @@ add_action( 'wp_head', function () {
 function dr_home_intro() {
 	if ( ! is_front_page() || is_paged() ) { return; }
 	echo '<section class="dr-intro" aria-label="Über Deutsche Rezepte"><div class="vr-container dr-intro__in">';
-	echo '<img class="dr-intro__img" src="' . esc_url( dr_asset( 'brand/chef-avatar.webp' ) ) . '" alt="Dein Koch von Deutsche Rezepte" width="64" height="64" loading="lazy" decoding="async">';
+	echo '<img class="dr-intro__img" src="' . esc_url( dr_asset( 'brand/chef-avatar-v2.webp' ) ) . '" alt="Dein Koch von Deutsche Rezepte" width="64" height="64" loading="lazy" decoding="async">';
 	echo '<div class="dr-intro__t"><p class="dr-intro__h">Authentische deutsche Rezepte zum Nachkochen</p>';
 	echo '<p class="dr-intro__s">Schnitzel, Currywurst, Käsespätzle, Schwarzwälder Kirschtorte &amp; mehr — das Rezept zum Video gibt es hier, Schritt für Schritt. <a href="' . esc_url( DR_FB_PAGE ) . '" target="_blank" rel="noopener nofollow">Facebook</a></p></div>';
 	echo '</div></section>';
