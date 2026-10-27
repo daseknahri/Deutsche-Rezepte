@@ -258,3 +258,14 @@ function dr_import_bundles() {
 if ( (int) get_option( 'dr_seed_version', 0 ) < DR_SEED_VERSION ) { dr_seed_site(); }
 dr_apply_ads();
 dr_import_bundles();
+
+/* Self-heal pretty permalinks on every start: a long import can be killed by the PHP
+   time limit right after something emptied the rewrite rules, leaving every pretty URL
+   (including ads.txt) as a 404 until a flush. Idempotent and cheap. */
+if ( '' === get_option( 'permalink_structure', '' ) ) {
+	update_option( 'permalink_structure', '/%postname%/' );
+}
+if ( ! get_option( 'rewrite_rules' ) ) {
+	flush_rewrite_rules( false );
+	dr_log( 'rewrite rules regenerated' );
+}
