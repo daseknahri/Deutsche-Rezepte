@@ -13,8 +13,8 @@ for i in $(seq 1 120); do
 done
 $WP db check >/dev/null 2>&1 || { log "database not reachable, giving up"; exit 0; }
 
-log "syncing theme + plugin"
-for d in themes/viral-reader themes/deutsche-rezepte plugins/automation-hamri; do
+log "syncing theme + plugin + mu-plugins"
+for d in themes/viral-reader themes/deutsche-rezepte plugins/automation-hamri mu-plugins; do
   rm -rf "/var/www/html/wp-content/$d"
   mkdir -p "$(dirname /var/www/html/wp-content/$d)"
   cp -r "/opt/site/wp-content/$d" "/var/www/html/wp-content/$d"

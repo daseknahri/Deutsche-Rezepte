@@ -11,7 +11,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'DR_VERSION', '1.2.0' );
+define( 'DR_VERSION', '1.3.0' );
 define( 'DR_FB_PAGE', 'https://www.facebook.com/profile.php?id=61595540835887' );
 
 define( 'DR_HERO_SIZES', '(max-width:1200px) 100vw, 1200px' );
@@ -37,6 +37,16 @@ add_action( 'wp_enqueue_scripts', function () {
 add_action( 'wp_head', function () {
 	printf( '<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n", esc_url( dr_asset( 'fonts/literata-400.woff2' ) ) );
 }, 2 );
+
+/* Third-party origins every page needs (Site Kit gtag + AdSense): preconnect once so the
+   browser opens the connections while the HTML still parses, instead of serial DNS+TLS
+   after each <script> is discovered. Scripts only — no crossorigin attribute. */
+add_action( 'wp_head', function () {
+	if ( is_admin() || is_feed() ) { return; }
+	foreach ( array( 'https://www.googletagmanager.com', 'https://pagead2.googlesyndication.com', 'https://googleads.g.doubleclick.net' ) as $o ) {
+		printf( '<link rel="preconnect" href="%s">' . "\n", esc_url( $o ) );
+	}
+}, 1 );
 
 /* ---------- Parent feature switches ---------- */
 add_filter( 'vr_enable_share_at_end', '__return_false' );     /* replaced by the richer end block below */
