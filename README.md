@@ -13,6 +13,8 @@ Cloned from the Oma Gerda (germ) repo and rebranded: same self-seeding engine, r
 - `wp-content/plugins/automation-hamri` — publishing/SEO/ads engine (vendored, build-v9 9.48.0)
 - `wp-content/mu-plugins/dr-page-cache.php` — tiny full-page cache (per URL + phone/desktop key, 30 min TTL,
   purge on publish; logged-in/commenters bypass). Header `X-DR-Cache: hit` on served pages.
+- `wp-content/mu-plugins/dr-gsc-verify.php` — serves the Google Search Console HTML verification file
+  (/googlec475efa985256bc9.html). Property verified 2026-10-28; do not remove the file.
 - `data/bundles/*.zip` — recipe bundles (posts.json + images), imported on first start; empty until the first batch lands
 - `seed/seed.php` — brand, German pages, menu, ads, recipe import (idempotent, resumable)
 - `docker/site-init.sh` — waits for DB, syncs theme/plugin, installs WP (de_DE) once, runs the seed
