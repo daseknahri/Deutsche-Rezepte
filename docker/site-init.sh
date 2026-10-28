@@ -19,6 +19,8 @@ for d in themes/viral-reader themes/deutsche-rezepte plugins/automation-hamri mu
   mkdir -p "$(dirname /var/www/html/wp-content/$d)"
   cp -r "/opt/site/wp-content/$d" "/var/www/html/wp-content/$d"
 done
+# Fresh code ships on every start: drop the full-page cache so no visitor gets a pre-redeploy HTML snapshot.
+rm -rf /var/www/html/wp-content/cache/dr-page 2>/dev/null || true
 chown -R www-data:www-data /var/www/html/wp-content
 
 URL="${SITE_URL:-${SERVICE_FQDN_WORDPRESS:-http://localhost}}"

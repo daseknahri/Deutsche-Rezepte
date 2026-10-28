@@ -11,7 +11,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'DR_VERSION', '1.3.0' );
+define( 'DR_VERSION', '1.4.0' );
 define( 'DR_FB_PAGE', 'https://www.facebook.com/profile.php?id=61595540835887' );
 
 define( 'DR_HERO_SIZES', '(max-width:1200px) 100vw, 1200px' );
@@ -24,13 +24,31 @@ function dr_asset( $rel ) {
    The parent inlines get_stylesheet_directory()/style.css, which for a child theme is only the child's
    header. So inline the parent stylesheet first, then the brand layer, keeping the parent's no-blocking-CSS
    speed win. Font URLs in the brand CSS are made absolute because inline CSS resolves against the page. */
+function dr_minify_css( $css ) {
+	/* Conservative: comments stripped first, then double-quoted strings swapped out so
+	   whitespace inside them survives (verified: no CSS string here contains comment
+	   markers; single quotes occur only inside comments). Page cache means this runs
+	   only on cache misses. */
+	$css = preg_replace( '#/\*.*?\*/#s', '', $css );
+	$keep = array();
+	$css  = preg_replace_callback( '#"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"#', function ( $m ) use ( &$keep ) {
+		$k = "\x01" . count( $keep ) . "\x02";
+		$keep[ $k ] = $m[0];
+		return $k;
+	}, $css );
+	$css = preg_replace( '/\s+/', ' ', $css );
+	$css = preg_replace( '/\s*([{}:;,>+~])\s*/', '$1', $css );
+	$css = str_replace( array( ';}', ' 0px', ':0px', ' 0em' ), array( '}', ' 0', ':0', ' 0' ), $css );
+	return trim( strtr( $css, $keep ) );
+}
+
 add_action( 'wp_enqueue_scripts', function () {
 	$parent = get_template_directory() . '/style.css';
 	$brand  = get_stylesheet_directory() . '/assets/deutsche-rezepte.css';
 	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- bundled theme files.
 	$css = ( is_readable( $parent ) ? file_get_contents( $parent ) : '' ) . "\n" . ( is_readable( $brand ) ? file_get_contents( $brand ) : '' );
 	$css = str_replace( '__THEME__', get_stylesheet_directory_uri(), $css );
-	wp_add_inline_style( 'viral-reader', $css );
+	wp_add_inline_style( 'viral-reader', dr_minify_css( $css ) );
 }, 11 );
 
 /* Preload the reading font so the first paragraph paints in Literata, not a fallback. */
@@ -258,10 +276,27 @@ function dr_top_ad() {
 }
 
 /* Site Kit's AdSense snippet loads the very same adsbygoogle.js a second time (plus a ca-host-pub param): twice the
-   JavaScript on a phone. The plugin already prints the one tag this site needs. */
+   JavaScript on a phone. The single deferred loader printed below is the only one this site fetches. */
 add_filter( 'googlesitekit_adsense_tag_blocked', function ( $blocked ) {
 	return '' !== dr_ad_client() ? true : $blocked;
 } );
+
+/* ---------- AdSense loader: deferred, so ads never race the content for first-paint bandwidth ----------
+   The plugin prints the adsbygoogle.js loader into <head> (wp_head prio 8). On a throttled phone the ~110 KB
+   loader + gtag compete with the hero/LCP image for the first seconds of the connection — lab LCP lands in
+   double digits and the speed audit flags "unused JavaScript". So we drop the plugin's early tag and inject the
+   same loader ~2.5 s after DOMContentLoaded instead. Safe because every <ins> unit only does
+   (adsbygoogle=window.adsbygoogle||[]).push({}) — those calls queue until the loader arrives and AdSense then
+   drains the queue. Slots are fixed-size, so a late fill shifts nothing (CLS). Site Kit's tag stays blocked
+   above, so exactly one loader is ever fetched. */
+add_action( 'init', function () { remove_action( 'wp_head', 'wpap_ads_head', 8 ); }, 20 );
+add_action( 'wp_head', function () {
+	if ( is_admin() || is_feed() ) { return; }
+	$client = dr_ad_client();
+	if ( '' === $client ) { return; }
+	echo '<link rel="preconnect" href="https://pagead2.googlesyndication.com" crossorigin>' . "\n";
+	echo '<script>addEventListener("DOMContentLoaded",function(){setTimeout(function(){var s=document.createElement("script");s.async=true;s.crossOrigin="anonymous";s.src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' . esc_js( $client ) . '";document.head.appendChild(s);},2500);});</script>' . "\n";
+}, 7 );
 
 /* ---------- In-feed ads: one after every 4 story cards on home, category, tag, author and search lists ----------
    Hooked on the_post, which fires right before each card renders, so the ad lands between cards inside the
@@ -375,9 +410,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	$file = get_template_directory() . '/assets/css/hardening.css';
 	if ( ! is_readable( $file ) ) { return; }
 	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- bundled theme file.
-	$css = (string) file_get_contents( $file );
-	$css = preg_replace( '#/\*.*?\*/#s', '', $css );
-	$css = trim( preg_replace( '/\s+/', ' ', $css ) );
+	$css = dr_minify_css( (string) file_get_contents( $file ) );
 	if ( '' === $css || strlen( $css ) > 40000 ) { return; }   /* fall back to the normal <link> */
 	wp_add_inline_style( 'viral-reader', $css );
 	wp_dequeue_style( 'viral-reader-hardening' );
