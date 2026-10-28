@@ -15,6 +15,10 @@ Cloned from the Oma Gerda (germ) repo and rebranded: same self-seeding engine, r
   purge on publish; logged-in/commenters bypass). Header `X-DR-Cache: hit` on served pages.
 - `wp-content/mu-plugins/dr-gsc-verify.php` — serves the Google Search Console HTML verification file
   (/googlec475efa985256bc9.html). Property verified 2026-10-28; do not remove the file.
+- Speed notes (theme 1.4.0): the AdSense loader is NOT printed in <head> — the theme removes the plugin's
+  early tag and injects the same loader 2.5 s after DOMContentLoaded (ins units queue their pushes; fixed-size
+  slots mean zero CLS). Inline CSS (parent + brand + hardening) is minified at enqueue. The page cache is
+  wiped on every container start so a redeploy never serves pre-deploy HTML.
 - `data/bundles/*.zip` — recipe bundles (posts.json + images), imported on first start; empty until the first batch lands
 - `seed/seed.php` — brand, German pages, menu, ads, recipe import (idempotent, resumable)
 - `docker/site-init.sh` — waits for DB, syncs theme/plugin, installs WP (de_DE) once, runs the seed
