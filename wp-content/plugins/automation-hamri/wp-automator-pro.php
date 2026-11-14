@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Automation Hamri
  * Description: An advanced AI-powered bulk content generator for WordPress that automates SEO articles, internal linking, and multi-engine image sourcing. Optimized for high-traffic niches.
- * Version:     9.48.0
+ * Version:     9.49.0
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * Author:      Oussama Hamri
@@ -622,12 +622,12 @@ function wpap_bulk_max_items() {
     return (int) apply_filters( 'wpap_bulk_max_items', 300 );
 }
 
-define( 'WPAP_VERSION', '9.48.0' );
+define( 'WPAP_VERSION', '9.49.0' );
 define( 'WPAP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPAP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPAP_TABLE',      'wpap_generated_posts' );
 define( 'WPAP_TOMB_TABLE', 'wpap_tombstones' );   /* durable source-key tombstones (indexed; replaces the O(n) wpap_automation_deleted_keys option) */
-define( 'WPAP_DB_VERSION', '4' );   /* bump to re-run the table dbDelta on init (v2: image_url VARCHAR(800)→TEXT — signed S3/CDN URLs run >800 bytes and were truncating; matches build-final so the shared table never downgrades. v3: add a composite (meta_key,meta_value) index to wp_postmeta so the dedup lookups on _wpap_source_key / _wpap_source_image_hash are index seeks, not full meta_key-group scans, at 100k+ posts. v4: add the wpap_tombstones table + backfill it from the wpap_automation_deleted_keys option, so tombstone writes are O(1) INSERT IGNOREs and the dedup lookup is an indexed SELECT instead of unserializing a ~1.2MB option) */
+define( 'WPAP_DB_VERSION', '5' );   /* bump to re-run the table dbDelta on init (v2: image_url VARCHAR(800)→TEXT — signed S3/CDN URLs run >800 bytes and were truncating; matches build-final so the shared table never downgrades. v3: add a composite (meta_key,meta_value) index to wp_postmeta so the dedup lookups on _wpap_source_key / _wpap_source_image_hash are index seeks, not full meta_key-group scans, at 100k+ posts. v4: add the wpap_tombstones table + backfill it from the wpap_automation_deleted_keys option, so tombstone writes are O(1) INSERT IGNOREs and the dedup lookup is an indexed SELECT instead of unserializing a ~1.2MB option. v5: add the wpap_subscribers table for the Wave-0 email capture ([wpap_signup]); build-v9-only table, no shared-table conflict with build-final) */
 
 /* ── API key resolver: a wp-config.php constant wins over the DB option ──
    Lets site owners define keys in wp-config.php (kept out of the database
@@ -696,6 +696,25 @@ function wpap_create_table() {
         source_key  VARCHAR(191)    NOT NULL,
         created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY  (source_key)
+    ) {$c};" );
+
+    /* Wave-0 email capture: one row per email (UNIQUE email), consent proof +
+       unsubscribe token, no IP stored. Build-v9-only table (no build-final
+       counterpart); created here so the init self-heal (dbDelta on version
+       bump) provisions it on every site that upgrades. */
+    $sub = $wpdb->prefix . WPAP_SUBSCRIBERS_TABLE;
+    dbDelta( "CREATE TABLE {$sub} (
+        id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        email       VARCHAR(191)    NOT NULL DEFAULT '',
+        list        VARCHAR(50)     NOT NULL DEFAULT '',
+        consent     TINYINT(1)      NOT NULL DEFAULT 0,
+        status      VARCHAR(20)     NOT NULL DEFAULT 'subscribed',
+        source      VARCHAR(100)    NOT NULL DEFAULT '',
+        unsub_token VARCHAR(64)     NOT NULL DEFAULT '',
+        created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        UNIQUE KEY email (email),
+        KEY status (status)
     ) {$c};" );
 }
 
@@ -836,6 +855,7 @@ function wpap_admin_menu() {
     add_submenu_page( 'wp-automator-pro', 'Settings', 'Settings', 'manage_options', 'wp-automator-pro-settings', 'wpap_render_settings' );
     add_submenu_page( 'wp-automator-pro', 'Bulk ZIP Publish', 'Bulk ZIP Publish', 'manage_options', 'wp-automator-pro-bundle', 'wpap_render_bundle' );
     add_submenu_page( 'wp-automator-pro', 'Apply Rewrites', 'Apply Rewrites', 'manage_options', 'wp-automator-pro-apply', 'wpap_render_apply_rewrites' );
+    add_submenu_page( 'wp-automator-pro', 'Abonnenten', 'Abonnenten', 'manage_options', 'wpap-subscribers', 'wpap_render_subscribers' );   /* 9.49.0: Wave-0 email capture list + CSV export (rendered in includes/signup.php) */
 }
 
 /* ════════════════════════════════════════════
@@ -885,6 +905,7 @@ require_once __DIR__ . '/includes/automation.php'; // Google-Sheet automation cr
 require_once __DIR__ . '/includes/ai-content.php'; // AI content + image generation — DO NOT EDIT (AI generation pipeline)
 require_once __DIR__ . '/includes/seo-schema.php'; // Front-end SEO head, meta description, Recipe/Article/Breadcrumb schema, related posts
 require_once __DIR__ . '/includes/ads.php'; // ads.txt, IndexNow, ad zones (shortcode/block) + in-content injection
+require_once __DIR__ . '/includes/signup.php'; // 9.49.0: email capture [wpap_signup] + wpap_subscribers (Wave-0 pilot; OFF by default via wpap_signup_enabled)
 require_once __DIR__ . '/includes/settings-io.php'; // Settings export/import + admin dashboard health widget
 require_once __DIR__ . '/includes/editor-tools.php'; // Gutenberg Author Tools — meta box + derived fields
 require_once __DIR__ . '/includes/facebook-page.php'; // 9.43.0: Facebook Page auto-poster (opt-in; pulls in facebook-page-admin.php)

@@ -157,7 +157,7 @@ add_filter( 'the_content', function ( $content ) {
 	$out    .= '<button type="button" role="menuitem" data-dr-copy>Link kopieren</button>';
 	$out    .= '</span></span>';
 	$out .= '</div>';
-	$out .= '<p class="dr-follow">Mehr deutsche Rezepte gibt es auf <a href="' . esc_url( DR_FB_PAGE ) . '" target="_blank" rel="noopener nofollow">Facebook</a> – folge uns, damit du kein Rezept verpasst.</p>';
+	$out .= '<p class="dr-follow">Mehr deutsche Rezepte gibt es auf <a href=\"mailto:daseknahri@gmail.com\">daseknahri@gmail.com</a> – folge uns, damit du kein Rezept verpasst.</p>';
 	$out .= '</aside>';
 
 	/* Print + share-more behaviour (printed once per page). */
@@ -486,3 +486,35 @@ add_action( 'template_redirect', function () {
 		return str_replace( '</body>', $js . '</body>', $html );
 	} );
 }, 2 );
+
+/* ---------- E-Book-Anmeldung (Wave-0-Pilot, 2026-11-13) ----------
+   Alle drei Platzierungen laufen über den Shortcode [wpap_signup] aus dem
+   Hamri-Plugin — der liefert '' solange die Option `wpap_signup_enabled`
+   nicht auf '1' steht. Die Platzierungen sind also ab dem ersten Tag im Code,
+   aber öffentlich unsichtbar bis zur Freigabe (go-live: Option setzen +
+   /ebook/-Seite veröffentlichen). Die Datenschutzklausel (§8) wird zur
+   Laufzeit an den Inhalt der Datenschutzerklärung angehängt — ein späterer
+   Seed-Lauf (dr_page überschreibt die Seite) kann sie nicht löschen. */
+add_filter( 'the_content', function ( $content ) {
+	if ( ! is_singular( 'post' ) || ! in_the_loop() || ! is_main_query() ) { return $content; }
+	if ( ! function_exists( 'do_shortcode' ) ) { return $content; }
+	return $content . do_shortcode( '[wpap_signup context="post"]' );
+}, 35 );
+
+/* Footer-Band auf jeder Seite (nicht auf der /ebook/-Seite selbst — dort
+   steht das Formular schon im Inhalt). */
+add_action( 'wp_footer', function () {
+	if ( is_page( 'ebook' ) ) { return; }
+	if ( ! function_exists( 'do_shortcode' ) ) { return; }
+	echo '<div class="dr-signup-band">' . do_shortcode( '[wpap_signup context="footer"]' ) . '</div>';
+} );
+
+/* Datenschutzklausel §8 — nur solange die Anmeldung freigeschaltet ist.
+   Wortlaut vom Betreiber vor dem Go-live freigegeben (siehe Wave-0-Bericht). */
+add_filter( 'the_content', function ( $content ) {
+	if ( ! is_page( 'datenschutz' ) || ! in_the_loop() || ! is_main_query() ) { return $content; }
+	if ( ! function_exists( 'wpap_signup_enabled' ) || ! wpap_signup_enabled() ) { return $content; }
+	$content .= '<h2>8. E-Mail-Anmeldung (E-Book)</h2>'
+		. '<p>Wenn du dich für unser kostenloses E-Book „365 Tage Deutsche Rezepte“ anmeldest, nutzen wir deine E-Mail-Adresse nur dafür, dir den Download zu schicken und dich ab und zu über neue Rezepte zu informieren. Grundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Deine Adresse bleibt in der Datenbank dieser Website und wird nicht an Dritte weitergegeben. Du kannst deine Einwilligung jederzeit widerrufen — per Abmeldelink in einer E-Mail oder per Nachricht an <a href=\"mailto:daseknahri@gmail.com"\>daseknahri@gmail.com</a>; deine Adresse wird dann gelöscht. Mehr zu deinen Rechten steht unter Punkt 7.</p>';
+	return $content;
+}, 20 );

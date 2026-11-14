@@ -4,7 +4,7 @@ Tags: content, automation, adsense, seo, publishing
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 9.48.0
+Stable tag: 9.49.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -49,6 +49,10 @@ No. When Yoast, Rank Math, All in One SEO, SEOPress or The SEO Framework is acti
 No. It renders its own ad zones and SEO/recipe output on any theme, and defers to a dedicated SEO plugin if one is active.
 
 == Changelog ==
+
+= 9.49.0 =
+* New: email capture (Wave-0 pilot) — `[wpap_signup]` shortcode + subscriber list with CSV export. Off by default until enabled; stores emails in the site's own database, no IP stored, no data shared. The ebook download appears on screen right after signup.
+* Full history: CHANGELOG.md.
 
 = 9.48.0 =
 * Fix: re-sending a post with the same `id` (Direct Publish, Bulk ZIP, REST) is now skipped instead of creating a duplicate — always on, independent of "Skip duplicate titles". Posts without an `id` behave as before.

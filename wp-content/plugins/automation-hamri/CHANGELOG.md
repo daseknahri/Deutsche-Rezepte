@@ -3,6 +3,11 @@
 Newest-first. build-v9 is the modular (`includes/*.php`), full-featured product that keeps its
 front-end (SEO/ads/recipe). See `readme.txt` for the WordPress-directory changelog.
 
+## 9.49.0
+
+### Added
+- **Email capture (Wave-0 pilot, Deutsche Rezepte).** New `[wpap_signup]` shortcode + `wpap_subscribers` table + "Abonnenten" admin list with CSV export. A visitor enters an email and ticks the consent checkbox (unchecked by default, required); the row is stored in the site's own database and the ebook download appears on screen immediately. Public `POST wpap/v1/signup` (nonce + honeypot + per-email throttle + duplicate guard) and `GET wpap/v1/unsubscribe` (per-row token link), plus a no-JS admin-post fallback. **OFF by default** (`wpap_signup_enabled` option, default `0`) — the shortcode, the endpoint and the theme placements render / accept nothing until it is set to `1`. No IP address is stored, no tracking on the form, no data leaves the site in Phase 1 (no sending; Brevo double opt-in + welcome mail land in Phase 2 on the same table).
+
 ## 9.48.0
 
 **Safety parity with build-final (BL-116, BL-119).** No setting default changed. ONE behaviour change is on by
